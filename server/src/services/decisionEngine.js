@@ -1,11 +1,11 @@
 const responseSchema = {
-  type: 'OBJECT',
+  type: 'object',
   properties: {
-    coreSummary: { type: 'STRING' },
-    optionA: { type: 'OBJECT', properties: { name: { type: 'STRING' }, pros: { type: 'ARRAY', items: { type: 'STRING' } }, cons: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['name', 'pros', 'cons'] },
-    optionB: { type: 'OBJECT', properties: { name: { type: 'STRING' }, pros: { type: 'ARRAY', items: { type: 'STRING' } }, cons: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['name', 'pros', 'cons'] },
-    blindSpot: { type: 'STRING' },
-    objectiveRecommendation: { type: 'STRING' }
+    coreSummary: { type: 'string' },
+    optionA: { type: 'object', properties: { name: { type: 'string' }, pros: { type: 'array', items: { type: 'string' } }, cons: { type: 'array', items: { type: 'string' } } }, required: ['name', 'pros', 'cons'] },
+    optionB: { type: 'object', properties: { name: { type: 'string' }, pros: { type: 'array', items: { type: 'string' } }, cons: { type: 'array', items: { type: 'string' } } }, required: ['name', 'pros', 'cons'] },
+    blindSpot: { type: 'string' },
+    objectiveRecommendation: { type: 'string' }
   },
   required: ['coreSummary', 'optionA', 'optionB', 'blindSpot', 'objectiveRecommendation']
 };
@@ -25,24 +25,24 @@ export async function analyzeDilemma(rawDilemma) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY is missing from server/.env');
 
-  // Current stable Gemini Flash model. Gemini recommends the Interactions API for current models.
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+  const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       model: 'gemini-3.6-flash',
       input: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}`,
       response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'dilemma_decision', schema: responseSchema }
+        type: 'text',
+        mime_type: 'application/json',
+        schema: responseSchema
       }
     })
   });
 
   const data = await response.json();
   if (!response.ok) throw new Error(`Gemini API error: ${data?.error?.message || `HTTP ${response.status}`}`);
-
-  const text = data?.output_text || data?.output?.text || data?.output?.[0]?.text;
+  const text = data?.output_text || data?.outputs?.find((x) => x?.type === 'text')?.text;
   if (!text) throw new Error('Gemini returned an empty response.');
-  return typeof text === 'string' ? JSON.parse(text) : text;
+  return JSON.parse(text);
 }
