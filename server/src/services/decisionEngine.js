@@ -1,32 +1,29 @@
-import OpenAI from 'openai';
+import { GoogleGenAI, Type } from '@google/genai';
 
-const schema = {
-  type: 'object',
-  additionalProperties: false,
+const responseSchema = {
+  type: Type.OBJECT,
   properties: {
-    coreSummary: { type: 'string' },
+    coreSummary: { type: Type.STRING },
     optionA: {
-      type: 'object',
-      additionalProperties: false,
+      type: Type.OBJECT,
       properties: {
-        name: { type: 'string' },
-        pros: { type: 'array', items: { type: 'string' } },
-        cons: { type: 'array', items: { type: 'string' } }
+        name: { type: Type.STRING },
+        pros: { type: Type.ARRAY, items: { type: Type.STRING } },
+        cons: { type: Type.ARRAY, items: { type: Type.STRING } }
       },
       required: ['name', 'pros', 'cons']
     },
     optionB: {
-      type: 'object',
-      additionalProperties: false,
+      type: Type.OBJECT,
       properties: {
-        name: { type: 'string' },
-        pros: { type: 'array', items: { type: 'string' } },
-        cons: { type: 'array', items: { type: 'string' } }
+        name: { type: Type.STRING },
+        pros: { type: Type.ARRAY, items: { type: Type.STRING } },
+        cons: { type: Type.ARRAY, items: { type: Type.STRING } }
       },
       required: ['name', 'pros', 'cons']
     },
-    blindSpot: { type: 'string' },
-    objectiveRecommendation: { type: 'string' }
+    blindSpot: { type: Type.STRING },
+    objectiveRecommendation: { type: Type.STRING }
   },
   required: ['coreSummary', 'optionA', 'optionB', 'blindSpot', 'objectiveRecommendation']
 };
@@ -46,20 +43,17 @@ Rules:
 8. Return only the requested JSON object.`;
 
 export async function analyzeDilemma(rawDilemma) {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0.2,
-    response_format: {
-      type: 'json_schema',
-      json_schema: { name: 'dilemma_decision', strict: true, schema }
-    },
-    messages: [
-      { role: 'system', content: instructions },
-      { role: 'user', content: rawDilemma }
-    ]
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}`,
+    config: {
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+      responseSchema
+    }
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  return JSON.parse(response.text);
 }
