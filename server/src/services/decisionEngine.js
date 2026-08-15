@@ -1,29 +1,27 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
 const responseSchema = {
-  type: Type.OBJECT,
+  type: 'OBJECT',
   properties: {
-    coreSummary: { type: Type.STRING },
+    coreSummary: { type: 'STRING' },
     optionA: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
-        name: { type: Type.STRING },
-        pros: { type: Type.ARRAY, items: { type: Type.STRING } },
-        cons: { type: Type.ARRAY, items: { type: Type.STRING } }
+        name: { type: 'STRING' },
+        pros: { type: 'ARRAY', items: { type: 'STRING' } },
+        cons: { type: 'ARRAY', items: { type: 'STRING' } }
       },
       required: ['name', 'pros', 'cons']
     },
     optionB: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
-        name: { type: Type.STRING },
-        pros: { type: Type.ARRAY, items: { type: Type.STRING } },
-        cons: { type: Type.ARRAY, items: { type: Type.STRING } }
+        name: { type: 'STRING' },
+        pros: { type: 'ARRAY', items: { type: 'STRING' } },
+        cons: { type: 'ARRAY', items: { type: 'STRING' } }
       },
       required: ['name', 'pros', 'cons']
     },
-    blindSpot: { type: Type.STRING },
-    objectiveRecommendation: { type: Type.STRING }
+    blindSpot: { type: 'STRING' },
+    objectiveRecommendation: { type: 'STRING' }
   },
   required: ['coreSummary', 'optionA', 'optionB', 'blindSpot', 'objectiveRecommendation']
 };
@@ -43,17 +41,33 @@ Rules:
 8. Return only the requested JSON object.`;
 
 export async function analyzeDilemma(rawDilemma) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    throw new Error('GEMINI_API_KEY is missing from server/.env');
+  }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}`,
-    config: {
-      temperature: 0.2,
-      responseMimeType: 'application/json',
-      responseSchema
-    }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}` }] }],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        responseSchema
+      }
+    })
   });
 
-  return JSON.parse(response.text);
+  const data = await response.json();
+  if (!response.ok) {
+    const message = data?.error?.message || `Gemini API returned HTTP ${response.status}`;
+    throw new Error(`Gemini API error: ${message}`);
+  }
+
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned an empty response.');
+
+  return JSON.parse(text);
 }
