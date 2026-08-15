@@ -25,8 +25,9 @@ app.post('/api/analyze', async (req, res) => {
     const decision = await analyzeDilemma(rawDilemma);
     res.json(decision);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Unable to analyze the dilemma right now.' });
+    console.error('AI analysis failed:', error);
+    const message = error?.message || 'Unknown AI error';
+    res.status(500).json({ error: `AI analysis failed: ${message}` });
   }
 });
 
