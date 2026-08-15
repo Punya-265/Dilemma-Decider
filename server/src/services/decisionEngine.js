@@ -25,21 +25,24 @@ export async function analyzeDilemma(rawDilemma) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY is missing from server/.env');
 
-  // Use Gemini's current REST endpoint with a currently supported Flash model.
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const response = await fetch(url, {
+  // Current stable Gemini Flash model. Gemini recommends the Interactions API for current models.
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}` }] }],
-      generationConfig: { temperature: 0.2, responseMimeType: 'application/json', responseSchema }
+      model: 'gemini-3.6-flash',
+      input: `${instructions}\n\nUSER DILEMMA:\n${rawDilemma}`,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'dilemma_decision', schema: responseSchema }
+      }
     })
   });
 
   const data = await response.json();
   if (!response.ok) throw new Error(`Gemini API error: ${data?.error?.message || `HTTP ${response.status}`}`);
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  const text = data?.output_text || data?.output?.text || data?.output?.[0]?.text;
   if (!text) throw new Error('Gemini returned an empty response.');
-  return JSON.parse(text);
+  return typeof text === 'string' ? JSON.parse(text) : text;
 }
